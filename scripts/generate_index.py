@@ -1,37 +1,54 @@
 #!/usr/bin/env python3
-# scripts/generate_index.py
-import json, glob, os, datetime
-from dateutil import parser as dateparser
+import os, sys, json, uuid, shutil
+from datetime import datetime
 
-CLIPS_DIR = "clips"
-OUT_FILE = os.path.join(CLIPS_DIR, "index.json")
+CLIPS_DIR = "clips"  # donde se guardan todos los videos y metadatos
 
-def load_clip(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+def ask_input(prompt, default=None):
+    val = input(prompt)
+    if not val.strip() and default is not None:
+        return default
+    return val.strip()
 
 def main():
-    files = sorted(glob.glob(os.path.join(CLIPS_DIR, "*.json")))
-    clips = []
-    for f in files:
-        if f.endswith("index.json"):
-            continue
-        try:
-            c = load_clip(f)
-            clips.append(c)
-        except Exception as e:
-            print("skip", f, e)
-    # sort by upload_date if present
-    def keyfn(x):
-        try:
-            return dateparser.parse(x.get("upload_date"))
-        except Exception:
-            return datetime.datetime.min
-    clips.sort(key=keyfn, reverse=True)
-    out = {"generated_at": datetime.datetime.utcnow().isoformat() + "Z", "count": len(clips), "clips": clips}
-    with open(OUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, indent=2)
-    print("Wrote", OUT_FILE, "with", len(clips), "clips")
+    print("=== Ro-Leak Upload Tool ===")
+    title = ask_input("Title: ")
+    description = ask_input("Description: ")
+    tags = ask_input("Tags (comma-separated): ").split(",")
+    tags = [t.strip() for t in tags if t.strip()]
+    video_path = ask_input("Path to video file: ")
+
+    if not os.path.isfile(video_path):
+        print("❌ Video file does not exist.")
+        return
+
+    # Generate unique ID
+    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+    vid_id = f"{timestamp}_{uuid.uuid4().hex[:6]}"
+    vid_folder = os.path.join(CLIPS_DIR, vid_id)
+    os.makedirs(vid_folder, exist_ok=True)
+
+    # Copy video
+    video_filename = os.path.basename(video_path)
+    dest_video_path = os.path.join(vid_folder, video_filename)
+    shutil.copy2(video_path, dest_video_path)
+
+    # Generate metadata.json
+    metadata = {
+        "id": vid_id,
+        "title": title,
+        "description": description,
+        "tags": tags,
+        "upload_date": datetime.utcnow().isoformat() + "Z",
+        "video_file": video_filename
+    }
+    metadata_path = os.path.join(vid_folder, "metadata.json")
+    with open(metadata_path, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=2)
+
+    print(f"✅ Video saved in {vid_folder}")
+    print(f"✅ Metadata saved in {metadata_path}")
 
 if __name__ == "__main__":
+    os.makedirs(CLIPS_DIR, exist_ok=True)
     main()
