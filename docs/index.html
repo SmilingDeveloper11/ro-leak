@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ro-Leak — Clips</title>
+  <style>
+    body { font-family: Inter, system-ui, sans-serif; margin: 1rem; background:#0f172a; color:#e6eef8 }
+    h1 { margin-bottom:.5rem }
+    #grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
+    .card { background:rgba(255,255,255,0.03); padding:10px; border-radius:10px; box-shadow: 0 6px 18px rgba(2,6,23,0.6) }
+    .thumb { width:100%; height:150px; object-fit:cover; border-radius:6px; background:#061226; display:block; }
+    .meta { margin-top:8px; font-size:14px; }
+    .tags { margin-top:6px; color:#9fb0d9; font-size:12px; }
+    a.link { color:#9fe7c4; text-decoration:none }
+    .small { font-size:12px; color:#98a7c3 }
+  </style>
+</head>
+<body>
+  <h1>Ro-Leak</h1>
+  <p class="small">Clips captured in ER:LC — roleplay only. Showing latest uploads.</p>
+
+  <div id="grid">Loading clips…</div>
+
+  <script>
+    async function load() {
+      try {
+        const res = await fetch('/clips/index.json', {cache: 'no-store'});
+        if (!res.ok) throw new Error('index.json not found');
+        const data = await res.json();
+        const grid = document.getElementById('grid');
+        grid.innerHTML = '';
+        if (!data.clips || !data.clips.length) {
+          grid.innerHTML = '<div class="card">No clips yet.</div>';
+          return;
+        }
+        for (const c of data.clips) {
+          const card = document.createElement('div');
+          card.className = 'card';
+          const thumbUrl = c.thumbnail || '';
+          // embed strategy: show thumbnail or fallback
+          const thumb = document.createElement('img');
+          thumb.className = 'thumb';
+          thumb.src = thumbUrl || 'https://via.placeholder.com/640x360?text=No+thumbnail';
+          card.appendChild(thumb);
+
+          const title = document.createElement('div');
+          title.className = 'meta';
+          title.innerHTML = `<strong>${c.clip_type || 'Clip'}</strong> — <span class="small">by ${c.uploader}</span>`;
+          card.appendChild(title);
+
+          const desc = document.createElement('div');
+          desc.className = 'small';
+          desc.style.marginTop = '6px';
+          desc.textContent = c.description || '';
+          card.appendChild(desc);
+
+          const actions = document.createElement('div');
+          actions.style.marginTop = '8px';
+
+          if (c.video_url) {
+            const link = document.createElement('a');
+            link.className = 'link';
+            link.href = c.video_url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = 'Open video';
+            actions.appendChild(link);
+            actions.appendChild(document.createTextNode(' • '));
+            const embed = document.createElement('a');
+            embed.href = '#';
+            embed.textContent = 'Preview';
+            embed.onclick = (e) => {
+              e.preventDefault();
+              // quick preview: open in new window (user can close)
+              window.open(c.video_url, '_blank','noopener');
+            }
+            actions.appendChild(embed);
+          } else {
+            actions.textContent = 'No video URL';
+          }
+
+          const tags = document.createElement('div');
+          tags.className = 'tags';
+          tags.textContent = (c.tags || []).join(', ');
+          card.appendChild(actions);
+          card.appendChild(tags);
+
+          grid.appendChild(card);
+        }
+      } catch (err) {
+        console.error(err);
+        document.getElementById('grid').innerHTML = '<div class="card">Failed to load clips index.</div>';
+      }
+    }
+    load();
+  </script>
+</body>
+</html>
